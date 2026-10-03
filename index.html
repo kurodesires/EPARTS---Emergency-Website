@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0648a8">
+  <title>EPARTS | ACT Bulacao Campus</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="public-page">
+    <header class="topbar">
+      <a class="brand" href="#home"><img class="logo" src="https://cdn.corenexis.com/f/tuPgbQwbPGB.png" alt="ACT logo"><b>ACT BULACAO CAMPUS</b></a>
+      <nav><a href="#home">Home</a><a href="#about">About</a><a href="#features">Features</a><a href="#tips">Emergency Tips</a><a href="#contacts">Contacts</a></nav>
+      <button class="button" data-login>Log In</button>
+    </header>
+    <main>
+      <section class="hero" id="home">
+        <div class="hero-photo"></div><div class="hero-copy"><p class="eyebrow">ACT BULACAO CAMPUS</p><h1>Emergency Preparedness &amp; Patient Response Tracking System</h1>
+          <div class="alert"><span class="shield">✚</span><div><strong>In Case of Emergency</strong><small>Every second counts. Report and respond quickly.</small></div><button class="button red" data-login>Report Now</button></div>
+          <div class="hero-actions"><button class="button" data-login>Log In</button><a class="button light" href="#features">ⓘ Learn More</a></div>
+        </div>
+      </section>
+      <section class="help" id="features"><h2>Emergency Information &amp; Support</h2><div class="cards">
+        <article><i class="icon blue">▣</i><h3>Emergency Information</h3><p>Access important emergency guides and announcements.</p></article>
+        <article><i class="icon coral">☎</i><h3>Emergency Contacts</h3><p>Quick access to school nurses and the Emergency Response Team.</p></article>
+        <article><i class="icon green">▤</i><h3>Patient Response Tracking</h3><p>Securely track and manage patient response records.</p></article>
+        <article><i class="icon gold">♢</i><h3>Be Prepared, Stay Safe</h3><p>Guidance and procedures for every emergency.</p></article>
+      </div></section>
+      <section class="info-strip" id="about"><h2>Preparedness starts with a quick response.</h2><p>One place for campus emergency reports, response records, and student pass requests.</p></section>
+      <section class="help" id="tips"><h2>Emergency Tips</h2><div class="cards"><article><h3>Fire</h3><p>Raise the alarm, leave belongings, use the nearest safe exit, and gather at the assembly point.</p></article><article><h3>Earthquake</h3><p>Drop, cover, and hold on. After shaking stops, evacuate carefully and avoid damaged areas.</p></article><article><h3>First aid</h3><p>Alert the clinic nurse or ERT. Do not move an injured person unless there is immediate danger.</p></article><article><h3>Evacuation</h3><p>Follow posted routes and staff instructions. Keep access roads clear for responders.</p></article></div></section>
+      <section class="help contacts" id="contacts"><h2>EMERGENCY CONTACTS</h2><div class="contact-list"><p><b>Clinic Nurse</b><br>Campus clinic</p><p><b>Emergency Response Team</b><br>Room 201</p><p><b>Talisay Fire Department</b><br><a href="tel:2728277">272-8277</a></p></div></section>
+    </main>
+    <footer><img class="logo" src="https://cdn.corenexis.com/f/tuPgbQwbPGB.png" alt="ACT logo"><p>Emergency Preparedness &amp;<br>Patient Response Tracking System<br>By Group 1-Opal</p><div><b>Quick Links</b><a href="#home">Home</a><a href="#about">About EPARTS</a><a href="#features">Features &amp; Support</a><a href="#tips">Emergency Tips</a><a href="#contacts">Emergency Contacts</a></div></footer>
+  </div>
+
+  <div id="app" class="hidden">
+    <aside class="sidebar"><a class="brand side-brand" href="#"><img class="logo" src="https://cdn.corenexis.com/f/tuPgbQwbPGB.png" alt="ACT logo"><b>ACT BULACAO<br>CAMPUS</b></a><div class="side-links">
+      <button data-view="dashboard" class="active">Dashboard</button><button data-view="report">Report Emergency</button><button data-view="records">Patient Records</button><button data-view="procedures">Emergency Procedures</button><button data-view="contacts">Emergency Contacts</button><button data-view="incidents">Incident History</button><button data-view="passes">Emergency Pass Slip</button><button data-view="settings">Settings</button>
+    </div><button id="logout" class="logout">Log out</button></aside>
+    <div class="workspace"><header class="appbar"><button class="menu" id="menu" aria-label="Toggle sidebar">☰</button><span id="user-label"></span><button class="notification-button" id="notification-button">Notifications <span id="notification-count">0</span></button><span class="avatar" id="avatar">A</span><div id="notification-panel" class="notification-panel hidden"></div></header><main id="view" class="view"></main></div>
+  </div>
+
+  <div id="auth-modal" class="modal hidden"><div class="modal-card"><button class="close" id="close-modal">×</button><img class="logo" src="https://cdn.corenexis.com/f/tuPgbQwbPGB.png" alt="ACT logo"><h2 id="auth-title">Welcome back</h2><p id="auth-subtitle">Sign in to your campus account.</p><form id="auth-form"><label id="account-type-field">Account type<select name="role"><option value="student">Student</option><option value="school_staff">School staff</option><option value="clinic_nurse">Clinic nurse</option><option value="ert">ERT</option><option value="admin">Admin</option></select></label><label id="name-field" hidden>Full name<input name="name" autocomplete="name"></label><label id="grade-field" hidden>Grade level &amp; section<input name="gradeSection" placeholder="11 Opal or 12 Opal"></label><label id="email-field" hidden>Email<input name="email" type="email" autocomplete="email"></label><label id="identifier-field" hidden>Email<input name="identifier" autocomplete="username"></label><label id="password-field" hidden>Password<input name="password" type="password" minlength="8" autocomplete="current-password"></label><label id="admin-password-field" hidden>Admin sign up password<input name="adminPassword" type="password"></label><button class="button full" id="auth-submit">Log In</button><p id="auth-error" class="error"></p></form><button id="auth-toggle" class="text-button">Create student account</button></div></div>
+  <script src="script.js"></script>
+</body>
+</html>
