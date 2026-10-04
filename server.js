@@ -100,6 +100,32 @@ async function route(req, res) {
     if (!user) return send(res, 401, { error: 'Please log in to continue.' });
     if (req.method === 'GET' && url.pathname === '/api/me') return send(res, 200, { user: safeUser(user) });
     if (req.method === 'GET' && url.pathname === '/api/data') return send(res, 200, { user: safeUser(user), passes: isStaff(user) ? store.passes : store.passes.filter(item => item.userId === user.id), incidents: store.incidents, patients: isStaff(user) ? store.patients : store.patients.filter(item => item.reporterId === user.id) });
+    if (url.pathname === '/api/messages') {
+      if (!['clinic_nurse', 'ert'].includes(user.role)) return send(res, 403, { error: 'ERT and Clinic Nurse accounts only.' });
+      if (req.method === 'GET') {
+        const messages = store.messages || [];
+        let changed = false;
+        for (const message of messages) if (message.recipientRole === user.role) {
+          if (!message.readAt) { message.readAt = new Date().toISOString(); changed = true; }
+          for (const notification of store.notifications || []) if (notification.messageId === message.id) {
+            notification.readBy ||= [];
+            if (!notification.readBy.includes(user.id)) { notification.readBy.push(user.id); changed = true; }
+          }
+        }
+        if (changed) writeStore(store);
+        return send(res, 200, { messages: messages.slice(-200) });
+      }
+      if (req.method === 'POST') {
+        const input = await body(req);
+        const text = String(input.text || '').trim();
+        if (!text || text.length > 2000) return send(res, 400, { error: 'Write a message up to 2,000 characters.' });
+        const recipientRole = user.role === 'ert' ? 'clinic_nurse' : 'ert';
+        const message = { id: crypto.randomUUID(), senderId: user.id, senderName: user.name, senderRole: user.role, recipientRole, text, sentAt: new Date().toISOString() };
+        store.messages ||= []; store.messages.push(message); store.notifications ||= [];
+        store.notifications.unshift({ id: crypto.randomUUID(), roles: [recipientRole], title: `Message from ${user.role === 'ert' ? 'ERT' : 'Clinic Nurse'}`, message: `${user.name}: ${text.slice(0, 140)}`, messageId: message.id, createdAt: message.sentAt, readBy: [] });
+        writeStore(store); return send(res, 201, { message });
+      }
+    }
     if (req.method === 'GET' && url.pathname === '/api/notifications') {
       const notifications = store.notifications || [];
       return send(res, 200, { notifications: notifications.filter(item => !item.resolved && (item.userId === user.id || (item.roles || []).includes(user.role))).slice(0, 30) });
@@ -132,12 +158,14 @@ async function route(req, res) {
       const input = await body(req); const description = String(input.description || '').trim();
       if (!description) return send(res, 400, { error: 'Describe the emergency.' });
       if (user.role === 'student' && (!user.name || !['11', '12'].includes(user.grade) || !user.section)) return send(res, 400, { error: 'Complete your name, grade level, and section in Settings before reporting.' });
-      const incident = { id: crypto.randomUUID(), description, location: String(input.location || 'Campus').trim(), injury: String(input.injury || 'Unspecified').trim(), severity: String(input.severity || 'Moderate').trim(), affectedPerson: user.role === 'student' ? user.name : String(input.affectedPerson || user.name).trim(), reporterId: user.id, reporter: user.name, status: 'Pending approval', createdAt: new Date().toISOString() };
-      const patient = { id: crypto.randomUUID(), name: incident.affectedPerson, grade: user.grade || '', section: user.section || '', location: incident.location, injury: incident.injury, severity: incident.severity, status: 'Pending approval', incidentId: incident.id, reporterId: user.id, createdAt: incident.createdAt, recordedBy: user.name };
+      const handledByClinic = ['clinic_nurse', 'ert'].includes(user.role);
+      const createdAt = new Date().toISOString();
+      const incident = { id: crypto.randomUUID(), description, location: String(input.location || 'Campus').trim(), injury: String(input.injury || 'Unspecified').trim(), severity: String(input.severity || 'Moderate').trim(), affectedPerson: user.role === 'student' ? user.name : String(input.affectedPerson || user.name).trim(), reporterId: user.id, reporter: user.name, status: handledByClinic ? 'Active' : 'Pending approval', ...(handledByClinic ? { approvedBy: user.name, approvedByRole: user.role, approvedAt: createdAt } : {}), createdAt };
+      const patient = { id: crypto.randomUUID(), name: incident.affectedPerson, grade: user.grade || '', section: user.section || '', location: incident.location, injury: incident.injury, severity: incident.severity, status: handledByClinic ? 'Approved' : 'Pending approval', ...(handledByClinic ? { approvedBy: user.name, approvedByRole: user.role, approvedAt: createdAt } : {}), incidentId: incident.id, reporterId: user.id, createdAt, recordedBy: user.name };
       incident.patientId = patient.id;
       store.incidents.unshift(incident); store.patients.unshift(patient);
       store.notifications ||= [];
-      store.notifications.unshift({ id: crypto.randomUUID(), roles: ['clinic_nurse', 'ert'], title: 'Emergency report needs approval', message: `${user.name}: ${incident.description} · ${incident.location}`, incidentId: incident.id, createdAt: incident.createdAt, readBy: [] });
+      if (!handledByClinic) store.notifications.unshift({ id: crypto.randomUUID(), roles: ['clinic_nurse', 'ert'], title: 'Emergency report needs approval', message: `${user.name}: ${incident.description} · ${incident.location}`, incidentId: incident.id, createdAt, readBy: [] });
       writeStore(store); return send(res, 201, { incident });
     }
     if (req.method === 'POST' && url.pathname.match(/^\/api\/incidents\/[^/]+\/approve$/)) {
@@ -161,7 +189,7 @@ async function route(req, res) {
       incident.status = 'Resolved'; incident.resolvedAt = new Date().toISOString(); writeStore(store); return send(res, 200, { incident });
     }
     if (req.method === 'PATCH' && url.pathname.match(/^\/api\/incidents\/[^/]+$/)) {
-      if (!['clinic_nurse', 'ert', 'admin'].includes(user.role)) return send(res, 403, { error: 'Clinic nurse, ERT, or admin access required.' });
+      if (!['clinic_nurse', 'ert'].includes(user.role)) return send(res, 403, { error: 'Only the clinic nurse or ERT can edit emergency reports.' });
       const id = decodeURIComponent(url.pathname.split('/')[3]);
       const incident = store.incidents.find(item => item.id === id);
       if (!incident) return send(res, 404, { error: 'Incident not found.' });
@@ -176,15 +204,45 @@ async function route(req, res) {
       if (patient) Object.assign(patient, { name: incident.affectedPerson, location: incident.location, injury: incident.injury, severity: incident.severity, editedBy: user.name, editedAt: incident.editedAt });
       writeStore(store); return send(res, 200, { incident });
     }
+    if (req.method === 'DELETE' && url.pathname.match(/^\/api\/incidents\/[^/]+$/)) {
+      if (!['clinic_nurse', 'ert'].includes(user.role)) return send(res, 403, { error: 'Only the clinic nurse or ERT can remove emergency reports.' });
+      const id = decodeURIComponent(url.pathname.split('/')[3]);
+      const index = store.incidents.findIndex(item => item.id === id);
+      if (index < 0) return send(res, 404, { error: 'Incident not found.' });
+      const [incident] = store.incidents.splice(index, 1);
+      store.patients = store.patients.filter(item => item.id !== incident.patientId && item.incidentId !== id);
+      store.notifications = (store.notifications || []).filter(item => item.incidentId !== id);
+      writeStore(store); return send(res, 200, { ok: true });
+    }
     if (req.method === 'POST' && url.pathname === '/api/patients') {
       if (!isStaff(user)) return send(res, 403, { error: 'Staff access required.' });
       const input = await body(req); const name = String(input.name || '').trim();
       if (!name) return send(res, 400, { error: 'Enter a patient name.' });
-      const patient = { id: crypto.randomUUID(), name, grade: String(input.grade || '').trim(), section: String(input.section || '').trim(), location: String(input.location || '').trim(), injury: String(input.injury || '').trim(), severity: String(input.severity || '').trim(), details: String(input.details || '').trim(), createdAt: new Date().toISOString(), recordedBy: user.name };
-      store.patients.unshift(patient); writeStore(store); return send(res, 201, { patient });
+      const handledByClinic = ['clinic_nurse', 'ert'].includes(user.role);
+      const createdAt = new Date().toISOString();
+      const patient = { id: crypto.randomUUID(), name, grade: String(input.grade || '').trim(), section: String(input.section || '').trim(), location: String(input.location || '').trim(), injury: String(input.injury || '').trim(), severity: String(input.severity || '').trim(), details: String(input.details || '').trim(), status: handledByClinic ? 'Approved' : 'Pending approval', createdAt, recordedBy: user.name, createdById: user.id, ...(handledByClinic ? { approvedBy: user.name, approvedByRole: user.role, approvedAt: createdAt } : {}) };
+      store.patients.unshift(patient); store.notifications ||= [];
+      if (!handledByClinic) store.notifications.unshift({ id: crypto.randomUUID(), roles: ['clinic_nurse', 'ert'], title: 'Patient record needs approval', message: `${user.name} added a patient record for ${patient.name}.`, patientId: patient.id, createdAt, readBy: [] });
+      writeStore(store); return send(res, 201, { patient });
+    }
+    if (req.method === 'POST' && url.pathname.match(/^\/api\/patients\/[^/]+\/decision$/)) {
+      if (!['clinic_nurse', 'ert'].includes(user.role)) return send(res, 403, { error: 'Only the clinic nurse or ERT can review patient records.' });
+      const id = decodeURIComponent(url.pathname.split('/')[3]);
+      const patient = store.patients.find(item => item.id === id);
+      if (!patient) return send(res, 404, { error: 'Patient record not found.' });
+      if (patient.status !== 'Pending approval') return send(res, 409, { error: 'This patient record has already been reviewed.' });
+      const input = await body(req);
+      const decision = input.decision === 'Rejected' ? 'Rejected' : 'Approved';
+      const reviewedAt = new Date().toISOString();
+      patient.status = decision; patient.approvedBy = user.name; patient.approvedByRole = user.role; patient.approvedAt = reviewedAt;
+      for (const notification of store.notifications || []) if (notification.patientId === id && notification.roles) notification.resolved = true;
+      store.notifications ||= [];
+      if (patient.createdById) store.notifications.unshift({ id: crypto.randomUUID(), userId: patient.createdById, title: `Patient record ${decision.toLowerCase()}`, message: `Your patient record for ${patient.name} was ${decision.toLowerCase()} by ${user.name}.`, patientId: id, createdAt: reviewedAt, readBy: [] });
+      store.notifications.unshift({ id: crypto.randomUUID(), roles: ['clinic_nurse', 'ert'].filter(role => role !== user.role), title: `Patient record ${decision.toLowerCase()}`, message: `${user.name} ${decision.toLowerCase()} a record for ${patient.name}.`, patientId: id, createdAt: reviewedAt, readBy: [] });
+      writeStore(store); return send(res, 200, { patient });
     }
     if (req.method === 'PATCH' && url.pathname.match(/^\/api\/patients\/[^/]+$/)) {
-      if (!['clinic_nurse', 'ert', 'admin'].includes(user.role)) return send(res, 403, { error: 'Clinic nurse, ERT, or admin access required.' });
+      if (!['clinic_nurse', 'ert'].includes(user.role)) return send(res, 403, { error: 'Only the clinic nurse or ERT can edit patient records.' });
       const id = decodeURIComponent(url.pathname.split('/')[3]);
       const patient = store.patients.find(item => item.id === id);
       if (!patient) return send(res, 404, { error: 'Patient record not found.' });
