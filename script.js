@@ -264,7 +264,7 @@ async function croppedProfileImage(file) {
 
 function renderPasses(root, staff) {
   const visible = staff ? data.passes : data.passes.filter(item => item.userId === currentUser.id);
-  const rows = visible.map(item => `<tr><td>${esc(item.passId)}</td><td>${esc(item.name)}</td><td>${date(item.date)} · ${esc(item.time)}</td><td>${status(item.status)}</td><td class="actions"><button class="button small" data-pass="${esc(item.id)}">View</button>${staff && item.status === 'Pending' ? `<button class="button small" data-decision="Approved" data-id="${esc(item.id)}">Approve</button><button class="button small red" data-decision="Rejected" data-id="${esc(item.id)}">Reject</button>` : ''}</td></tr>`).join('');
+  const rows = visible.map(item => `<tr><td>${esc(item.passId)}</td><td>${esc(item.name)}</td><td>${date(item.date)} · ${esc(item.time)}</td><td>${status(item.status)}</td><td class="actions"><button class="button small" data-pass="${esc(item.id)}">View</button>${staff && item.status === 'Pending' ? `<button class="button small" data-decision="Approved" data-id="${esc(item.id)}">Approve</button><button class="button small red" data-decision="Rejected" data-id="${esc(item.id)}">Reject</button>` : ''}${currentUser.role === 'school_staff' ? `<button class="button small red" data-delete-pass="${esc(item.id)}">Remove</button>` : ''}</td></tr>`).join('');
   const canRequest = ['student', 'ert'].includes(currentUser.role);
   const now = new Date();
   const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -337,6 +337,11 @@ function bindViewActions() {
   $$('[data-decision]').forEach(button => button.addEventListener('click', async () => {
     const comment = prompt('Optional approval comment:') || '';
     try { await api(`/passes/${encodeURIComponent(button.dataset.id)}/decision`, { method: 'POST', body: JSON.stringify({ decision: button.dataset.decision, comment }) }); await loadData(); renderView(); }
+    catch (error) { alert(error.message); }
+  }));
+  $$('[data-delete-pass]').forEach(button => button.addEventListener('click', async () => {
+    if (!confirm('Permanently remove this emergency pass request?')) return;
+    try { await api(`/passes/${encodeURIComponent(button.dataset.deletePass)}`, { method: 'DELETE' }); await loadData(); renderView(); }
     catch (error) { alert(error.message); }
   }));
   $$('[data-resolve]').forEach(button => button.addEventListener('click', async () => {

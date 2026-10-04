@@ -154,6 +154,13 @@ async function route(req, res) {
       pass.status = decision; pass.comment = String(input.comment || '').trim(); pass.approvals.push({ name: user.name, role: user.role, decision, at: new Date().toISOString() });
       writeStore(store); return send(res, 200, { pass });
     }
+    if (req.method === 'DELETE' && url.pathname.match(/^\/api\/passes\/[^/]+$/)) {
+      if (user.role !== 'school_staff') return send(res, 403, { error: 'Only School Staff can remove pass requests.' });
+      const id = decodeURIComponent(url.pathname.split('/')[3]);
+      const index = store.passes.findIndex(item => item.id === id);
+      if (index < 0) return send(res, 404, { error: 'Pass request not found.' });
+      store.passes.splice(index, 1); writeStore(store); return send(res, 200, { ok: true });
+    }
     if (req.method === 'POST' && url.pathname === '/api/incidents') {
       const input = await body(req); const description = String(input.description || '').trim();
       if (!description) return send(res, 400, { error: 'Describe the emergency.' });
