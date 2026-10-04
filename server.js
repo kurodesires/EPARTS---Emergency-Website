@@ -215,12 +215,13 @@ async function route(req, res) {
       writeStore(store); return send(res, 200, { ok: true });
     }
     if (req.method === 'POST' && url.pathname === '/api/patients') {
-      if (!isStaff(user)) return send(res, 403, { error: 'Staff access required.' });
+      if (!isStaff(user) && user.role !== 'student') return send(res, 403, { error: 'Staff or student access required.' });
+      if (user.role === 'student' && (!user.name || !['11', '12'].includes(user.grade) || !user.section)) return send(res, 400, { error: 'Complete your full name, grade level, and section in Settings first.' });
       const input = await body(req); const name = String(input.name || '').trim();
       if (!name) return send(res, 400, { error: 'Enter a patient name.' });
       const handledByClinic = ['clinic_nurse', 'ert'].includes(user.role);
       const createdAt = new Date().toISOString();
-      const patient = { id: crypto.randomUUID(), name, grade: String(input.grade || '').trim(), section: String(input.section || '').trim(), location: String(input.location || '').trim(), injury: String(input.injury || '').trim(), severity: String(input.severity || '').trim(), details: String(input.details || '').trim(), status: handledByClinic ? 'Approved' : 'Pending approval', createdAt, recordedBy: user.name, createdById: user.id, ...(handledByClinic ? { approvedBy: user.name, approvedByRole: user.role, approvedAt: createdAt } : {}) };
+      const patient = { id: crypto.randomUUID(), name, grade: user.role === 'student' ? user.grade : String(input.grade || '').trim(), section: user.role === 'student' ? user.section : String(input.section || '').trim(), location: String(input.location || '').trim(), injury: String(input.injury || '').trim(), severity: String(input.severity || '').trim(), details: String(input.details || '').trim(), status: handledByClinic ? 'Approved' : 'Pending approval', createdAt, recordedBy: user.name, createdById: user.id, reporterId: user.role === 'student' ? user.id : undefined, ...(handledByClinic ? { approvedBy: user.name, approvedByRole: user.role, approvedAt: createdAt } : {}) };
       store.patients.unshift(patient); store.notifications ||= [];
       if (!handledByClinic) store.notifications.unshift({ id: crypto.randomUUID(), roles: ['clinic_nurse', 'ert'], title: 'Patient record needs approval', message: `${user.name} added a patient record for ${patient.name}.`, patientId: patient.id, createdAt, readBy: [] });
       writeStore(store); return send(res, 201, { patient });
